@@ -1,0 +1,299 @@
+// Include the library:
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+
+const byte ROWS = 4; 
+const byte COLS = 4; 
+
+char hexaKeys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rowPins[ROWS] = {23, 25, 27, 29}; 
+byte colPins[COLS] = {31, 33, 35, 37}; 
+char customKey;
+
+
+bool on = false;
+bool setNumInj = false;
+bool setSpacing = false;
+bool setAbsorbTime = false;
+bool inject = false;
+int numInj = 20;
+int spacing = 6;
+int absorbT = 2;
+
+String screenText = String();
+String tempString = String();
+
+int signalPin = 12; // chose where to output the TTL from
+
+LiquidCrystal_I2C lcd = LiquidCrystal_I2C(0x27, 16, 2);
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+
+void setup() {
+  // put your setup code here, to run once:
+  lcd.init();
+  lcd.noBacklight();
+
+}
+
+void loop() {
+  if (!on) { return;} // skip if not on
+
+  // default text
+  screenText = "N:"+ String(numInj) + ", S:" + String(spacing) + "A:" + String(absorbT);
+  lcd.print(screenText);
+
+  // deal with set inj
+  if (setNumInj)
+  {
+    lcd.blink();
+    lcd.print(tempString);
+    customKey = customKeypad.getKey();
+
+     if (customKey)
+     {
+        if(strcmp(customKey, '#'))
+        {
+          setNumInj = false; 
+          lcd.noBlink(); 
+          return ; 
+        }
+        if(strcmp(customKey, 'A'))
+        {
+          numInj = tempString.toInt();
+          setNumInj = false;  
+          lcd.noBlink();         
+        }
+        else // any other text try to add
+        {
+          tempString = tempString + customKey;
+        }    
+     
+      }
+  }
+
+  // deal with spacing
+  if (setSpacing)
+  {
+    lcd.blink();
+    lcd.print(tempString);
+    customKey = customKeypad.getKey();
+
+     if (customKey)
+     {
+        if(strcmp(customKey, '#'))
+        {
+          setSpacing = false; 
+          lcd.noBlink(); 
+          return ; 
+        }
+        if(strcmp(customKey, 'B'))
+        {
+          spacing = tempString.toInt();
+          setSpacing = false;   
+          lcd.noBlink();  
+          return;     
+        }
+        else // any other text try to add
+        {
+          tempString = tempString + customKey;
+        }    
+     
+      }
+  }
+
+  // deal with absorption time
+  if (setAbsorbTime)
+  {
+    lcd.blink();
+    lcd.print(tempString);
+    customKey = customKeypad.getKey();
+
+     if (customKey)
+     {
+        if(strcmp(customKey, '#'))
+        {
+          setAbsorbTime = false; 
+          lcd.noBlink(); 
+          return ; 
+        }
+        
+        if(strcmp(customKey, 'C'))
+        {
+          spacing = tempString.toInt();
+          setAbsorbTime = false;   
+          lcd.noBlink();   
+          return;    
+        }
+        else // any other text try to add
+        {
+          tempString = tempString + customKey;
+          return;
+        }    
+     
+      }
+  }
+
+  // inject was pressed once
+  if (inject)
+  {
+    lcd.blink();
+    lcd.print("Press D again to inject");
+    customKey = customKeypad.getKey();
+
+     if (customKey)
+     {
+        if(strcmp(customKey, '#'))
+        {
+          inject = false; 
+          lcd.noBlink(); 
+          return ; 
+        }
+        
+        if(strcmp(customKey, 'D'))
+        {
+          // start injection procedure  
+
+          // go through number of injections
+          for (int i = 1; i <=numInj; i++)
+          {
+            lcd.print("Inj " + String(i) + "/" + String(numInj));
+            ////// INJECTION ////////////
+            digitalWrite(signalPin, LOW); 
+            delay(10);
+            digitalWrite(signalPin, HIGH);
+            delay(10);
+            digitalWrite(signalPin, LOW);  
+            /////////////////////////////
+
+            //////// check for abortion
+            customKey = customKeypad.getKey();
+            if (customKey)
+             {
+                if(strcmp(customKey, '#'))
+                {
+                  inject = false; 
+                  lcd.noBlink(); 
+                  return ; 
+                }
+             }
+             /////////////////////
+            // wait and print: 
+            for (int j = spacing; j >=0; j--)     
+            {
+              lcd.print("Wait: " + String(j) + " S" );
+              delay(1000);
+              //////// check for abortion
+            customKey = customKeypad.getKey();
+            if (customKey)
+             {
+                if(strcmp(customKey, '#'))
+                {
+                  inject = false; 
+                  lcd.noBlink(); 
+                  return ; 
+                }
+             }
+             /////////////////////
+            }
+          }
+
+          // absorb: convert to seconds
+
+          for (int j = absorbT*60; j >=0; j--)     
+            {
+              lcd.print("Wait: " + String(j) + " S" );
+              delay(1000);
+            }
+          inject = false;
+          return;
+        }
+        else // any other text try to add
+        {
+          inject = false;
+          return;
+        }    
+     
+      }
+  }
+  
+  // Not in the middle of setting
+
+  customKey = customKeypad.getKey();
+
+// check if anything received
+  if (customKey){
+     // first check if on signal is given
+     if(strcmp(customKey, '*'))
+     {
+      if (on)
+      {
+        lcd.noBacklight(); // lcd is on
+        lcd.noDisplay();
+        on = false;
+      }
+      else
+      {
+      lcd.backlight(); // lcd is on
+      lcd.display();
+      on = true;
+      
+     }
+     }
+
+     
+
+     // deal with setting 
+     if(strcmp(customKey, 'A'))
+     {
+      setNumInj = true;
+      setSpacing=false;
+      setAbsorbTime = false;      
+      tempString = String();
+      return;
+
+     }
+
+     if(strcmp(customKey, 'B'))
+     {
+      setSpacing = true;
+      setAbsorbTime = false;
+      setNumInj = false;
+      tempString = String();
+      return;
+
+     }
+
+     if(strcmp(customKey, 'C'))
+     {
+      setAbsorbTime = true;
+      setSpacing=false;
+      setAbsorbTime = false;
+      tempString = String();
+      return;
+
+     }
+
+     if(strcmp(customKey, 'D'))
+     {
+        inject = true;
+        setAbsorbTime = false;
+        setSpacing=false;
+        setAbsorbTime = false;
+        return;
+
+     }
+     
+      return;
+     }
+      
+      
+   
+
+
+}
