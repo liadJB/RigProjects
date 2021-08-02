@@ -12,8 +12,8 @@ char hexaKeys[ROWS][COLS] = {
   {'*', '0', '#', 'D'}
 };
 
-byte rowPins[ROWS] = {23, 25, 27, 29}; 
-byte colPins[COLS] = {31, 33, 35, 37}; 
+byte rowPins[ROWS] = {31, 33, 35, 37}; 
+byte colPins[COLS] = {23, 25, 27, 29}; 
 char customKey;
 
 
@@ -25,11 +25,12 @@ bool inject = false;
 int numInj = 20;
 int spacing = 6;
 int absorbT = 2;
+bool cancel = true;
 
 String screenText = String();
 String tempString = String();
 
-int signalPin = 12; // chose where to output the TTL from
+int signalPin = 49; // chose where to output the TTL from
 
 LiquidCrystal_I2C lcd = LiquidCrystal_I2C(0x27, 16, 2);
 Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
@@ -38,41 +39,48 @@ void setup() {
   // put your setup code here, to run once:
   lcd.init();
   lcd.noBacklight();
+  customKeypad.setHoldTime(1);
+  Serial.begin(9600);
+  Serial.println("Starting");
 
 }
 
 void loop() {
-  if (!on) { return;} // skip if not on
+  
 
   // default text
-  screenText = "N:"+ String(numInj) + ", S:" + String(spacing) + "A:" + String(absorbT);
+  screenText = "N:"+ String(numInj) + ", S:" + String(spacing) + ", A:" + String(absorbT);
+  lcd.setCursor(0, 0);
   lcd.print(screenText);
 
   // deal with set inj
   if (setNumInj)
   {
+    lcd.clear();
     lcd.blink();
     lcd.print(tempString);
-    customKey = customKeypad.getKey();
+    customKey = customKeypad.waitForKey();
 
      if (customKey)
      {
-        if(strcmp(customKey, '#'))
+        if(customKey == '#')
         {
           setNumInj = false; 
           lcd.noBlink(); 
           return ; 
         }
-        if(strcmp(customKey, 'A'))
+        if(customKey == 'A')
         {
           numInj = tempString.toInt();
           setNumInj = false;  
-          lcd.noBlink();         
+          lcd.noBlink();   
+          return;      
         }
-        else // any other text try to add
-        {
-          tempString = tempString + customKey;
-        }    
+         // any other text try to add
+        
+        tempString = tempString + String(customKey);
+        return;
+            
      
       }
   }
@@ -80,29 +88,30 @@ void loop() {
   // deal with spacing
   if (setSpacing)
   {
+    lcd.clear();
     lcd.blink();
     lcd.print(tempString);
-    customKey = customKeypad.getKey();
+    customKey = customKeypad.waitForKey();
 
      if (customKey)
      {
-        if(strcmp(customKey, '#'))
+        if(customKey == '#')
         {
           setSpacing = false; 
           lcd.noBlink(); 
           return ; 
         }
-        if(strcmp(customKey, 'B'))
+        if(customKey == 'B')
         {
           spacing = tempString.toInt();
           setSpacing = false;   
           lcd.noBlink();  
           return;     
         }
-        else // any other text try to add
-        {
-          tempString = tempString + customKey;
-        }    
+        // any other text try to add
+        
+        tempString = tempString + customKey;
+        return;
      
       }
   }
@@ -110,31 +119,32 @@ void loop() {
   // deal with absorption time
   if (setAbsorbTime)
   {
+    lcd.clear();
     lcd.blink();
     lcd.print(tempString);
-    customKey = customKeypad.getKey();
+    customKey = customKeypad.waitForKey();
 
      if (customKey)
      {
-        if(strcmp(customKey, '#'))
+        if(customKey == '#')
         {
           setAbsorbTime = false; 
           lcd.noBlink(); 
           return ; 
         }
         
-        if(strcmp(customKey, 'C'))
+        if(customKey == 'C')
         {
-          spacing = tempString.toInt();
+          absorbT = tempString.toInt();
           setAbsorbTime = false;   
           lcd.noBlink();   
           return;    
         }
-        else // any other text try to add
-        {
-          tempString = tempString + customKey;
-          return;
-        }    
+        // any other text try to add
+        
+         tempString = tempString + customKey;
+         return;
+           
      
       }
   }
@@ -142,26 +152,33 @@ void loop() {
   // inject was pressed once
   if (inject)
   {
+    lcd.clear();
+    lcd.setCursor(0,0);
     lcd.blink();
-    lcd.print("Press D again to inject");
-    customKey = customKeypad.getKey();
+    lcd.print("Press D");
+    lcd.setCursor(0,1);
+    lcd.print("to inject");
+    customKey = customKeypad.waitForKey();
 
      if (customKey)
      {
-        if(strcmp(customKey, '#'))
+        if(customKey == '#')
         {
           inject = false; 
           lcd.noBlink(); 
           return ; 
         }
         
-        if(strcmp(customKey, 'D'))
+        if(customKey == 'D')
         {
           // start injection procedure  
 
           // go through number of injections
           for (int i = 1; i <=numInj; i++)
           {
+            Serial.println("Inject: " + String(inject));
+            if (!inject) { return;}
+            lcd.clear();
             lcd.print("Inj " + String(i) + "/" + String(numInj));
             ////// INJECTION ////////////
             digitalWrite(signalPin, LOW); 
@@ -178,27 +195,58 @@ void loop() {
                 if(strcmp(customKey, '#'))
                 {
                   inject = false; 
+                  lcd.clear();
                   lcd.noBlink(); 
                   return ; 
                 }
+             }
+              Serial.println("State "+ String(customKeypad.getState()));
+              switch (customKeypad.getState()){
+                  case HOLD:
+                      if (customKey == '#') {
+                        Serial.println("HOLDING");
+                        inject = false;
+                        setAbsorbTime = false;
+                        setSpacing=false;
+                        setAbsorbTime = false;
+                        return;
+                        
+                      }
+                      break;
              }
              /////////////////////
             // wait and print: 
-            for (int j = spacing; j >=0; j--)     
+             
+            for (int j = spacing; j >=0 ; j--)     
             {
+              if (!inject) {return;}
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Inj " + String(i) + "/" + String(numInj));
+              lcd.setCursor(0,1);
               lcd.print("Wait: " + String(j) + " S" );
-              delay(1000);
+              
               //////// check for abortion
-            customKey = customKeypad.getKey();
+              Serial.println(" Waiting for key " + String(customKey));
+            
+             unsigned long currentMillis = millis();
+             unsigned long previousMillis = millis();
+             //delay
+             while ((currentMillis-previousMillis)<=1000){
+              currentMillis = millis();
+              customKey = customKeypad.getKey();
             if (customKey)
              {
-                if(strcmp(customKey, '#'))
+              Serial.println("key pressed: " + String(customKey));
+                if(customKey == '#')
                 {
+                  Serial.println("Cancel");
                   inject = false; 
                   lcd.noBlink(); 
+                  lcd.clear();                  
                   return ; 
                 }
-             }
+             }}
              /////////////////////
             }
           }
@@ -207,8 +255,40 @@ void loop() {
 
           for (int j = absorbT*60; j >=0; j--)     
             {
-              lcd.print("Wait: " + String(j) + " S" );
-              delay(1000);
+              if (!inject) {return;}
+              customKey = customKeypad.getKey();
+              if (customKey)
+               {
+                  if(customKey =='#')
+                  {
+                    inject = false; 
+                    lcd.noBlink(); 
+                    lcd.clear();
+                    j=-1;
+                    return ; 
+                  }
+               }
+               lcd.clear();
+              lcd.print("Absorb: " + String(j) + " S" );
+             unsigned long currentMillis = millis();
+             unsigned long previousMillis = millis();
+             //delay
+             while ((currentMillis-previousMillis)<=1000){currentMillis = millis();
+             customKey = customKeypad.getKey();
+            if (customKey)
+             {
+              Serial.println("key pressed: " + String(customKey));
+                if(customKey == '#')
+                {
+                  Serial.println("Cancel");
+                  inject = false; 
+                  lcd.noBlink(); 
+                  lcd.clear();                  
+                  return ; 
+                }
+             }
+             
+             }
             }
           inject = false;
           return;
@@ -224,12 +304,14 @@ void loop() {
   
   // Not in the middle of setting
 
-  customKey = customKeypad.getKey();
+Serial.println("Waiting for key");
+  char customKey = customKeypad.waitForKey();
 
 // check if anything received
   if (customKey){
+    Serial.println(customKey);
      // first check if on signal is given
-     if(strcmp(customKey, '*'))
+     if(customKey=='*')
      {
       if (on)
       {
@@ -246,45 +328,50 @@ void loop() {
      }
      }
 
-     
+     if (!on) {return;}
 
      // deal with setting 
-     if(strcmp(customKey, 'A'))
+     if(customKey == 'A')
      {
       setNumInj = true;
       setSpacing=false;
       setAbsorbTime = false;      
       tempString = String();
+      lcd.clear();
+      lcd.setCursor(0,0);
       return;
 
      }
 
-     if(strcmp(customKey, 'B'))
+     if(customKey == 'B')
      {
       setSpacing = true;
       setAbsorbTime = false;
       setNumInj = false;
       tempString = String();
+      lcd.clear();
       return;
 
      }
 
-     if(strcmp(customKey, 'C'))
+     if(customKey == 'C')
      {
       setAbsorbTime = true;
       setSpacing=false;
-      setAbsorbTime = false;
+      setNumInj = false;
       tempString = String();
+      lcd.clear();
       return;
 
      }
 
-     if(strcmp(customKey, 'D'))
+     if(customKey=='D')
      {
         inject = true;
         setAbsorbTime = false;
         setSpacing=false;
         setAbsorbTime = false;
+        lcd.clear();
         return;
 
      }
@@ -296,4 +383,20 @@ void loop() {
    
 
 
+}
+
+void keypadEvent(KeypadEvent key){
+    switch (customKeypad.getState()){
+    case HOLD:
+        if (key == '#') {
+          Serial.println("HOLDING");
+          inject = false;
+          setAbsorbTime = false;
+          setSpacing=false;
+          setAbsorbTime = false;
+          return;
+          
+        }
+        break;
+    }
 }
