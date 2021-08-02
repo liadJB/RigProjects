@@ -39,9 +39,11 @@ void setup() {
   // put your setup code here, to run once:
   lcd.init();
   lcd.noBacklight();
-  customKeypad.setHoldTime(1);
+  customKeypad.setHoldTime(5);
   Serial.begin(9600);
   Serial.println("Starting");
+  pinMode(signalPin, OUTPUT); 
+  digitalWrite(signalPin, HIGH);
 
 }
 
@@ -158,6 +160,7 @@ void loop() {
     lcd.print("Press D");
     lcd.setCursor(0,1);
     lcd.print("to inject");
+    digitalWrite(signalPin, HIGH);
     customKey = customKeypad.waitForKey();
 
      if (customKey)
@@ -176,16 +179,22 @@ void loop() {
           // go through number of injections
           for (int i = 1; i <=numInj; i++)
           {
+            digitalWrite(signalPin, LOW);
             Serial.println("Inject: " + String(inject));
-            if (!inject) { return;}
+            if (inject==false) { Serial.println("Inject false");return;}
             lcd.clear();
             lcd.print("Inj " + String(i) + "/" + String(numInj));
             ////// INJECTION ////////////
-            digitalWrite(signalPin, LOW); 
-            delay(10);
-            digitalWrite(signalPin, HIGH);
-            delay(10);
-            digitalWrite(signalPin, LOW);  
+            
+            //delay
+            unsigned long currentMillis = millis();
+            unsigned long previousMillis = millis();
+
+              Serial.println("LOW");
+            digitalWrite(signalPin, LOW);
+             delay(100);
+             Serial.println("HIGH");
+           digitalWrite(signalPin, HIGH);
             /////////////////////////////
 
             //////// check for abortion
@@ -200,20 +209,8 @@ void loop() {
                   return ; 
                 }
              }
-              Serial.println("State "+ String(customKeypad.getState()));
-              switch (customKeypad.getState()){
-                  case HOLD:
-                      if (customKey == '#') {
-                        Serial.println("HOLDING");
-                        inject = false;
-                        setAbsorbTime = false;
-                        setSpacing=false;
-                        setAbsorbTime = false;
-                        return;
-                        
-                      }
-                      break;
-             }
+              
+              
              /////////////////////
             // wait and print: 
              
@@ -247,6 +244,7 @@ void loop() {
                   return ; 
                 }
              }}
+              
              /////////////////////
             }
           }
@@ -383,20 +381,4 @@ Serial.println("Waiting for key");
    
 
 
-}
-
-void keypadEvent(KeypadEvent key){
-    switch (customKeypad.getState()){
-    case HOLD:
-        if (key == '#') {
-          Serial.println("HOLDING");
-          inject = false;
-          setAbsorbTime = false;
-          setSpacing=false;
-          setAbsorbTime = false;
-          return;
-          
-        }
-        break;
-    }
 }
