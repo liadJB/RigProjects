@@ -1,12 +1,14 @@
 # RigProjects
 
 # Nanoject II Project
-##Hardware
+## Hardware
 * Mega 2560 Board
 * 4X4 keypad ,based on this tutorial: https://www.circuitbasics.com/how-to-set-up-a-keypad-on-an-arduino/
 * ICC 16 X2 Screen, based on this tutorial: https://www.makerguides.com/character-i2c-lcd-arduino-tutorial/
 * AUX pin with wire ending (Choose Red and ground)
-
+## Software
+.ino file is the arduino script
+A suitable case that fits on top of a small plastic box 
 ## Keypad Mapping
 Colour is up to the implementer, of course.
 Keypad Pin|Colour|Arduino Pin
